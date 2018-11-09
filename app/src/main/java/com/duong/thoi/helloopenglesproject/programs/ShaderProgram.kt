@@ -29,6 +29,7 @@ abstract class ShaderProgram constructor(context: Context, vertexShaderResourceI
     companion object {
         // Uniform constants
         const val U_MATRIX = "u_Matrix"
+        const val U_COLOR = "u_Color"
         const val U_TEXTURE_UNIT = "u_TextureUnit"
 
         // Attribute constants
