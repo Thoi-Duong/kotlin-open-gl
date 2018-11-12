@@ -6,16 +6,16 @@ import javax.microedition.khronos.opengles.GL10
 import android.opengl.GLSurfaceView.Renderer
 import android.opengl.GLES20.*
 import android.opengl.Matrix.*
-import com.duong.thoi.helloopenglesproject.util.MatrixHelper
 import android.opengl.Matrix.setIdentityM
 import com.duong.thoi.helloopenglesproject.data.Table
 import com.duong.thoi.helloopenglesproject.programs.ColorShaderProgram
 import com.duong.thoi.helloopenglesproject.programs.TextureShaderProgram
 import com.duong.thoi.helloopenglesproject.objects.Mallet
 import com.duong.thoi.helloopenglesproject.objects.Puck
-import com.duong.thoi.helloopenglesproject.util.TextureHelper
 import android.opengl.Matrix.setLookAtM
 import android.opengl.Matrix.multiplyMM
+import com.duong.thoi.helloopenglesproject.util.*
+import kotlin.math.PI
 
 
 /**
@@ -39,6 +39,10 @@ class AirHockeyRenderer(_context: Context): Renderer {
     private var colorProgram: ColorShaderProgram? = null
     private var texture: Int = 0
 
+    private var malletPressed = false
+    private var blueMalletPosition: Point? = null
+    private val invertedViewProjectionMatrix = FloatArray(16)
+
 
     override fun onSurfaceCreated(glUnused: GL10, config: EGLConfig) {
         glClearColor(0.5f, 0.0f, 0.0f, 0.0f)
@@ -50,6 +54,8 @@ class AirHockeyRenderer(_context: Context): Renderer {
         textureProgram = TextureShaderProgram(context)
         colorProgram = ColorShaderProgram(context)
         texture = TextureHelper.loadTexture(context, R.drawable.air_hockey_surface)
+
+        blueMalletPosition = Point(0f, mallet!!.height / 2f, 0.4f)
     }
 
     /**
@@ -102,6 +108,7 @@ class AirHockeyRenderer(_context: Context): Renderer {
         glClear(GL_COLOR_BUFFER_BIT)
 
         multiplyMM(viewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
+        invertM(invertedViewProjectionMatrix, 0, viewProjectionMatrix, 0)
 
         // Draw the table.
 
@@ -114,13 +121,19 @@ class AirHockeyRenderer(_context: Context): Renderer {
         table!!.bindData(textureProgram!!)
         table!!.draw()
         // Draw the mallets.
+
         positionObjectInScene(0f, mallet!!.height / 2f, -0.4f)
         colorProgram!!.useProgram()
         colorProgram!!.setUniforms(modelViewProjectionMatrix, 1f, 0f, 0f)
         mallet!!.bindData(colorProgram!!)
         mallet!!.draw()
 
-        positionObjectInScene(0f, mallet!!.height / 2f, 0.4f); colorProgram!!.setUniforms(modelViewProjectionMatrix, 0f, 0f, 1f)
+//        positionObjectInScene(0f, mallet!!.height / 2f, 0.4f);
+
+        positionObjectInScene(blueMalletPosition!!.x, blueMalletPosition!!.y,
+                blueMalletPosition!!.z)
+
+        colorProgram!!.setUniforms(modelViewProjectionMatrix, 0f, 0f, 1f)
         // Note that we don't have to define the object data twice -- we just // draw the same mallet again but in a different position and with a // different color.
         mallet!!.draw()
         // Draw the puck.
@@ -128,6 +141,48 @@ class AirHockeyRenderer(_context: Context): Renderer {
         colorProgram!!.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
         puck!!.bindData(colorProgram!!)
         puck!!.draw()
+    }
+
+    fun handleTouchPress(normalizedX: Float, normalizedY: Float) {
+        val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
+        val p = Point(blueMalletPosition!!.x, blueMalletPosition!!.y, blueMalletPosition!!.z)
+
+        val malletBoundingSphere = Sphere(p, mallet!!.height / 2f)
+        malletPressed = Geometry.intersects(malletBoundingSphere, ray)
+    }
+    fun handleTouchDrag(normalizedX: Float, normalizedY: Float) {
+        if (malletPressed) {
+            val ray = convertNormalized2DPointToRay(normalizedX, normalizedY)
+            val plane = Plane(Point(0f,0f,0f), Vector(0f, 1f, 0f))
+
+            val touchPoint = Geometry.intersectionPoint(ray, plane)
+            blueMalletPosition = Point(touchPoint.x, mallet!!.height / 2f, touchPoint.z)
+        }
+    }
+
+    private fun convertNormalized2DPointToRay(normalizedX: Float, normalizedY: Float): Ray {
+        val nearPointNdc = floatArrayOf(normalizedX, normalizedY, -1f, 1f)
+        val farPointNdc = floatArrayOf(normalizedX, normalizedY, 1f, 1f)
+
+        val nearPointWorld = FloatArray(4)
+        val farPointWorld = FloatArray(4)
+
+        multiplyMV(nearPointWorld, 0, invertedViewProjectionMatrix, 0, nearPointNdc, 0)
+        multiplyMV(farPointWorld, 0, invertedViewProjectionMatrix, 0, farPointNdc, 0)
+
+        divideByW(nearPointWorld)
+        divideByW(farPointWorld)
+
+        val nearPointRay = Point(nearPointWorld[0], nearPointWorld[1], nearPointWorld[2])
+        val farPointRay = Point(farPointWorld[0], farPointWorld[1], farPointWorld[2])
+
+        return Ray(nearPointRay, Geometry.vectorBetween(nearPointRay, farPointRay))
+    }
+
+    private fun divideByW(vector: FloatArray) {
+        vector[0] /= vector[3]
+        vector[1] /= vector[3]
+        vector[2] /= vector[3]
     }
 
     private fun positionTableInScene() {
