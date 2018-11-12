@@ -16,6 +16,16 @@ import android.opengl.Matrix.setLookAtM
 import android.opengl.Matrix.multiplyMM
 import com.duong.thoi.helloopenglesproject.util.*
 import kotlin.math.PI
+import android.R.attr.y
+import android.R.attr.x
+import android.R.attr.radius
+import android.R.attr.radius
+import android.R.attr.y
+import android.R.attr.x
+
+
+
+
 
 
 /**
@@ -42,6 +52,15 @@ class AirHockeyRenderer(_context: Context): Renderer {
     private var malletPressed = false
     private var blueMalletPosition: Point? = null
     private val invertedViewProjectionMatrix = FloatArray(16)
+    private var previousBlueMalletPosition: Point? = null
+
+    private var puckPosition: Point? = null
+    private var puckVector: Vector? = null
+
+    private val leftBound = -0.5f
+    private val rightBound = 0.5f
+    private val farBound = -0.8f
+    private val nearBound = 0.8f
 
 
     override fun onSurfaceCreated(glUnused: GL10, config: EGLConfig) {
@@ -56,6 +75,9 @@ class AirHockeyRenderer(_context: Context): Renderer {
         texture = TextureHelper.loadTexture(context, R.drawable.air_hockey_surface)
 
         blueMalletPosition = Point(0f, mallet!!.height / 2f, 0.4f)
+        puckPosition = Point(0f, puck!!.height/2f, 0f)
+        puckVector = Vector(0f, 0f, 0f)
+
     }
 
     /**
@@ -107,6 +129,27 @@ class AirHockeyRenderer(_context: Context): Renderer {
         // Clear the rendering surface.
         glClear(GL_COLOR_BUFFER_BIT)
 
+        puckPosition = puckPosition!!.translate(puckVector!!)
+
+        val distance = Geometry.vectorBetween(blueMalletPosition!!, puckPosition!!).length()
+
+        if (distance < (puck!!.radius + mallet!!.radius)) puckVector = Geometry.vectorBetween(previousBlueMalletPosition!!, blueMalletPosition!!)
+
+        val puckXLessThanLeftBound = puckPosition!!.x < leftBound + puck!!.radius
+        val puckXMoreThanLeftBound = puckPosition!!.x > rightBound + puck!!.radius
+
+        if ( puckXLessThanLeftBound || puckXMoreThanLeftBound ) puckVector = Vector(-puckVector!!.x, puckVector!!.y, puckVector!!.z)
+
+        val puckZLessThanFarBound = puckPosition!!.z < farBound + puck!!.radius
+        val puckZMoreThanFarBound = puckPosition!!.z > nearBound - puck!!.radius
+
+        if ( puckZLessThanFarBound || puckZMoreThanFarBound ) puckVector = Vector(puckVector!!.x, puckVector!!.y, -puckVector!!.z)
+
+        val puckPositionX = clamp(puckPosition!!.x, leftBound + puck!!.radius, rightBound - puck!!.radius)
+        val puckPositionZ = clamp(puckPosition!!.z, farBound + puck!!.radius, nearBound - puck!!.radius)
+        puckPosition = Point(puckPositionX, puckPosition!!.y, puckPositionZ)
+
+
         multiplyMM(viewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
         invertM(invertedViewProjectionMatrix, 0, viewProjectionMatrix, 0)
 
@@ -137,7 +180,7 @@ class AirHockeyRenderer(_context: Context): Renderer {
         // Note that we don't have to define the object data twice -- we just // draw the same mallet again but in a different position and with a // different color.
         mallet!!.draw()
         // Draw the puck.
-        positionObjectInScene(0f, puck!!.height / 2f, 0f)
+        positionObjectInScene(puckPosition!!.x, puckPosition!!.y, puckPosition!!.z)
         colorProgram!!.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
         puck!!.bindData(colorProgram!!)
         puck!!.draw()
@@ -156,9 +199,21 @@ class AirHockeyRenderer(_context: Context): Renderer {
             val plane = Plane(Point(0f,0f,0f), Vector(0f, 1f, 0f))
 
             val touchPoint = Geometry.intersectionPoint(ray, plane)
-            blueMalletPosition = Point(touchPoint.x, mallet!!.height / 2f, touchPoint.z)
+
+            val x = clamp(touchPoint.x, leftBound + mallet!!.radius, rightBound - mallet!!.radius)
+            val y = mallet!!.height/2f
+            val z = clamp(-touchPoint.z, 0f + mallet!!.radius, nearBound - mallet!!.radius)
+
+            previousBlueMalletPosition = blueMalletPosition
+            blueMalletPosition = Point(x, y, z)
+
+            val distance = Geometry.vectorBetween(blueMalletPosition!!, puckPosition!!).length()
+
+            if (distance < (puck!!.radius + mallet!!.radius)) puckVector = Geometry.vectorBetween(previousBlueMalletPosition!!, blueMalletPosition!!)
         }
     }
+
+    private fun clamp(value: Float, min: Float, max: Float): Float = Math.min(max, Math.max(value, min))
 
     private fun convertNormalized2DPointToRay(normalizedX: Float, normalizedY: Float): Ray {
         val nearPointNdc = floatArrayOf(normalizedX, normalizedY, -1f, 1f)

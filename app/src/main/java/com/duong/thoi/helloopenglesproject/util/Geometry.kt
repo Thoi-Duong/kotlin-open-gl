@@ -27,7 +27,10 @@ class Vector(val x: Float, val y: Float, val z: Float) {
     fun length(): Float =  Math.sqrt((x * x + y * y + z * z).toDouble()).toFloat()
 
     // http://en.wikipedia.org/wiki/Cross_product
-    fun crossProduct(other: Vector): Vector = Vector((y * other.z) - (z * other.y), (z * other.x) - (x * other.z), (x * other.y) - (y * other.x))
+    fun crossProduct(other: Vector): Vector = Vector(
+            (y * other.z) - (z * other.y),
+            (z * other.x) - (x * other.z),
+            (x * other.y) - (y * other.x))
 
     // http://en.wikipedia.org/wiki/Dot_product
     fun dotProduct(other: Vector): Float = x * other.x + y * other.y + z * other.z
@@ -64,12 +67,9 @@ object Geometry {
         return areaOfTriangleTimesTwo / lengthOfBase
     }
 
-    fun intersectionPoint(ray: Ray, plane: Plane): Point {
-        val rayToPlaneVector = vectorBetween(ray.point, plane.point)
-
-        val scaleFactor = rayToPlaneVector.dotProduct(plane.normal) / ray.vector.dotProduct(plane.normal)
-
-        val intersectionPoint = ray.point.translate(ray.vector.scale(scaleFactor))
-        return ray.point.translate(ray.vector.scale(scaleFactor))
-    }
+    fun intersectionPoint(ray: Ray, plane: Plane): Point = ray.point.translate(
+            ray.vector.scale(
+                    vectorBetween(ray.point,
+                            plane.point
+                    ).dotProduct(plane.normal) / ray.vector.dotProduct(plane.normal)))
 }
