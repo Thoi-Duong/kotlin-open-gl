@@ -131,19 +131,15 @@ class AirHockeyRenderer(_context: Context): Renderer {
 
         puckPosition = puckPosition!!.translate(puckVector!!)
 
-        val distance = Geometry.vectorBetween(blueMalletPosition!!, puckPosition!!).length()
-
-        if (distance < (puck!!.radius + mallet!!.radius)) puckVector = Geometry.vectorBetween(previousBlueMalletPosition!!, blueMalletPosition!!)
-
         val puckXLessThanLeftBound = puckPosition!!.x < leftBound + puck!!.radius
         val puckXMoreThanLeftBound = puckPosition!!.x > rightBound + puck!!.radius
 
-        if ( puckXLessThanLeftBound || puckXMoreThanLeftBound ) puckVector = Vector(-puckVector!!.x, puckVector!!.y, puckVector!!.z)
+        if ( puckXLessThanLeftBound || puckXMoreThanLeftBound ) puckVector = Vector(-puckVector!!.x, puckVector!!.y, puckVector!!.z).scale(0.9f)
 
         val puckZLessThanFarBound = puckPosition!!.z < farBound + puck!!.radius
         val puckZMoreThanFarBound = puckPosition!!.z > nearBound - puck!!.radius
 
-        if ( puckZLessThanFarBound || puckZMoreThanFarBound ) puckVector = Vector(puckVector!!.x, puckVector!!.y, -puckVector!!.z)
+        if ( puckZLessThanFarBound || puckZMoreThanFarBound ) puckVector = Vector(puckVector!!.x, puckVector!!.y, -puckVector!!.z).scale(0.9f)
 
         val puckPositionX = clamp(puckPosition!!.x, leftBound + puck!!.radius, rightBound - puck!!.radius)
         val puckPositionZ = clamp(puckPosition!!.z, farBound + puck!!.radius, nearBound - puck!!.radius)
@@ -184,6 +180,8 @@ class AirHockeyRenderer(_context: Context): Renderer {
         colorProgram!!.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
         puck!!.bindData(colorProgram!!)
         puck!!.draw()
+
+        puckVector = puckVector!!.scale(0.99f);
     }
 
     fun handleTouchPress(normalizedX: Float, normalizedY: Float) {
